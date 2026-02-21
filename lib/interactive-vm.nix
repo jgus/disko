@@ -74,14 +74,46 @@ in
 
   system.build.vmWithDisko = hostPkgs.writers.writeDashBin "disko-vm" ''
     set -efux
+
+    # Parse arguments for diskoImagesScript
+    disko_args=()
+    qemu_args=()
+
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --pre-format-files|--post-format-files)
+          disko_args+=("$1" "$2" "$3")
+          shift 3
+          ;;
+        --build-memory)
+          disko_args+=("$1" "$2")
+          shift 2
+          ;;
+        *)
+          qemu_args+=("$1")
+          shift
+          ;;
+      esac
+    done
+
     export tmp=$(${hostPkgs.coreutils}/bin/mktemp -d)
     trap 'rm -rf "$tmp"' EXIT
+
+    # If diskoImagesScript arguments were provided, use the script to build the image
+    if [[ ''${#disko_args[@]} -gt 0 ]]; then
+      # Call diskoImagesScript to build the image
+      image_dir=$(${config.system.build.diskoImagesScript} "''${disko_args[@]}")
+    else
+      # Use the pre-built diskoImages
+      image_dir=${config.system.build.diskoImages}
+    fi
+
     ${lib.concatMapStringsSep "\n" (disk: ''
       ${hostPkgs.qemu}/bin/qemu-img create -f qcow2 \
-      -b ${config.system.build.diskoImages}/${lib.escapeShellArg disk.imageName}.qcow2 \
+      -b $image_dir/${lib.escapeShellArg disk.imageName}.qcow2 \
       -F qcow2 "$tmp"/${lib.escapeShellArg disk.imageName}.qcow2
     '') disks}
     set +f
-    ${config.system.build.vm}/bin/run-*-vm "$@"
+    ${config.system.build.vm}/bin/run-*-vm "''${qemu_args[@]}"
   '';
 }
