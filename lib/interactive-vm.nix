@@ -75,7 +75,6 @@ in
   system.build.vmWithDisko = hostPkgs.writers.writeDashBin "disko-vm" ''
     set -efux
 
-    # Parse arguments for diskoImagesScript
     disko_args=()
     qemu_args=()
 
@@ -99,10 +98,12 @@ in
     export tmp=$(${hostPkgs.coreutils}/bin/mktemp -d)
     trap 'rm -rf "$tmp"' EXIT
 
-    # If diskoImagesScript arguments were provided, use the script to build the image
     if [[ ''${#disko_args[@]} -gt 0 ]]; then
+      echo "***** diskoImagesScript parameters provided: ''${disko_args[@]}"
       # Call diskoImagesScript to build the image
       image_dir=$(${config.system.build.diskoImagesScript} "''${disko_args[@]}")
+      echo "***** Using image_dir: ''${image_dir}"
+      ls -al "''${image_dir}"
     else
       # Use the pre-built diskoImages
       image_dir=${config.system.build.diskoImages}
