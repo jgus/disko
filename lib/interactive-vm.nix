@@ -98,16 +98,7 @@ in
     export tmp=$(${hostPkgs.coreutils}/bin/mktemp -d)
     trap 'rm -rf "$tmp"' EXIT
 
-    if [[ ''${#disko_args[@]} -gt 0 ]]; then
-      echo "***** diskoImagesScript parameters provided: ''${disko_args[@]}"
-      # Call diskoImagesScript to build the image
-      image_dir=$(${config.system.build.diskoImagesScript} "''${disko_args[@]}")
-      echo "***** Using image_dir: ''${image_dir}"
-      ls -al "''${image_dir}"
-    else
-      # Use the pre-built diskoImages
-      image_dir=${config.system.build.diskoImages}
-    fi
+    image_dir=$(${config.system.build.diskoImagesScript} "''${disko_args[@]}")
 
     ${lib.concatMapStringsSep "\n" (disk: ''
       ${hostPkgs.qemu}/bin/qemu-img create -f qcow2 \
