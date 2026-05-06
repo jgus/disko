@@ -142,6 +142,9 @@ let
             boot.initrd.preDeviceCommands = lib.mkIf (!config.boot.initrd.systemd.enable) ''
               echo -n 'secretsecret' > /tmp/secret.key
             '';
+            boot.initrd.secrets = lib.mkIf config.boot.initrd.systemd.enable {
+              "/tmp/secret.key" = pkgs.writeText "secret.key" "secretsecret";
+            };
             boot.consoleLogLevel = lib.mkForce 100;
             boot.loader.systemd-boot.enable = lib.mkDefault efi;
           };
