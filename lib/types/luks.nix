@@ -236,44 +236,50 @@ in
 
         ${toString (
           lib.forEach config.additionalKeyFiles (keyFile: ''
-            cryptsetup luksAddKey "${config.device}" ${keyFile} ${formatKeyFileArgs}
+            if ! cryptsetup open --test-passphrase --key-file=${keyFile} "${config.device}" 2>/dev/null; then
+              cryptsetup luksAddKey "${config.device}" ${keyFile} ${formatKeyFileArgs}
+            fi
           '')
         )}
 
         ${lib.optionalString config.enrollRecovery ''
-          systemd-cryptenroll \
-            --recovery-key \
-            --unlock-key-file=${formatKeyFile} \
-            "${config.device}"
-          if [ -z ''${IN_DISKO_TEST+x} ]; then
-            set +x; read -p "Press Enter when you scanned the QR code offscreen or that the recovery key is stored securely."; set -x
+          if ! systemd-cryptenroll "${config.device}" 2>/dev/null | grep -qw recovery; then
+            systemd-cryptenroll \
+              --recovery-key \
+              --unlock-key-file=${formatKeyFile} \
+              "${config.device}"
+            if [ -z ''${IN_DISKO_TEST+x} ]; then
+              set +x; read -p "Press Enter when you scanned the QR code offscreen or that the recovery key is stored securely."; set -x
+            fi
           fi
         ''}
         ${lib.optionalString config.enrollFido2 ''
-          wait_for_token() {
-              set +f
-              echo "Waiting for FIDO2 token insertion..."
+          if ! systemd-cryptenroll "${config.device}" 2>/dev/null | grep -qw fido2; then
+            wait_for_token() {
+                set +f
+                echo "Waiting for FIDO2 token insertion..."
 
-              # Check if any FIDO2 device is available via /dev/hidraw*
-              while true; do
-                  if ls /dev/hidraw* &>/dev/null; then
-                      echo "FIDO2 device detected."
-                      break
-                  else
-                      echo "FIDO2 device not detected, waiting..."
-                      sleep 2
-                  fi
-              done
-              set -f
-          }
+                # Check if any FIDO2 device is available via /dev/hidraw*
+                while true; do
+                    if ls /dev/hidraw* &>/dev/null; then
+                        echo "FIDO2 device detected."
+                        break
+                    else
+                        echo "FIDO2 device not detected, waiting..."
+                        sleep 2
+                    fi
+                done
+                set -f
+            }
 
-          wait_for_token
-          systemd-cryptenroll \
-            --fido2-device=auto \
-            ''${SLOT_ZERO_TO_DELETE:+--wipe-slot=0} \
-            --unlock-key-file=${formatKeyFile} \
-            ${toString config.extraFido2EnrollArgs} \
-            "${config.device}"
+            wait_for_token
+            systemd-cryptenroll \
+              --fido2-device=auto \
+              ''${SLOT_ZERO_TO_DELETE:+--wipe-slot=0} \
+              --unlock-key-file=${formatKeyFile} \
+              ${toString config.extraFido2EnrollArgs} \
+              "${config.device}"
+          fi
         ''}
         ${lib.optionalString (config.content != null) config.content._create}
       '';
